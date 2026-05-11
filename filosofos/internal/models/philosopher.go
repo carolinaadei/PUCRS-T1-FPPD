@@ -13,6 +13,7 @@ type Philosopher struct {
 	ID        int
 	LeftFork  *Fork
 	RightFork *Fork
+	Stats     *Stats
 }
 
 func NewPhilosopher(
@@ -24,6 +25,7 @@ func NewPhilosopher(
 		ID:        id,
 		LeftFork:  left,
 		RightFork: right,
+		Stats:     &Stats{},
 	}
 }
 
@@ -35,7 +37,7 @@ func (p *Philosopher) Think() {
 		),
 	)
 
-	utils.RandomDelay(1000)
+	utils.RandomDelay(500)
 }
 
 func (p *Philosopher) Eat() {
@@ -46,7 +48,9 @@ func (p *Philosopher) Eat() {
 		),
 	)
 
-	utils.RandomDelay(1000)
+	utils.RandomDelay(500)
+
+	p.Stats.IncrementMeals()
 
 	logger.Log(
 		fmt.Sprintf(
@@ -56,21 +60,38 @@ func (p *Philosopher) Eat() {
 	)
 }
 
-func (p *Philosopher) Dine(
+func (p *Philosopher) DineWithWaiter(
 	wg *sync.WaitGroup,
+	waiter chan struct{},
 	iterations int,
 ) {
 	defer wg.Done()
 
 	for i := 0; i < iterations; i++ {
 
-		// Thinking
 		p.Think()
+
+		// Request permission from waiter
+		logger.Log(
+			fmt.Sprintf(
+				"Philosopher %d asking waiter permission",
+				p.ID,
+			),
+		)
+
+		waiter <- struct{}{}
+
+		logger.Log(
+			fmt.Sprintf(
+				"Philosopher %d received waiter permission",
+				p.ID,
+			),
+		)
 
 		// Pick left fork
 		logger.Log(
 			fmt.Sprintf(
-				"Philosopher %d trying to pick LEFT fork",
+				"Philosopher %d trying LEFT fork",
 				p.ID,
 			),
 		)
@@ -84,13 +105,12 @@ func (p *Philosopher) Dine(
 			),
 		)
 
-		// Artificial pause to increase deadlock probability
-		time.Sleep(200 * time.Millisecond)
+		time.Sleep(100 * time.Millisecond)
 
 		// Pick right fork
 		logger.Log(
 			fmt.Sprintf(
-				"Philosopher %d waiting for RIGHT fork",
+				"Philosopher %d trying RIGHT fork",
 				p.ID,
 			),
 		)
@@ -104,7 +124,6 @@ func (p *Philosopher) Dine(
 			),
 		)
 
-		// Eating
 		p.Eat()
 
 		// Release forks
@@ -113,7 +132,17 @@ func (p *Philosopher) Dine(
 
 		logger.Log(
 			fmt.Sprintf(
-				"Philosopher %d released both forks",
+				"Philosopher %d released forks",
+				p.ID,
+			),
+		)
+
+		// Release waiter permission
+		<-waiter
+
+		logger.Log(
+			fmt.Sprintf(
+				"Philosopher %d released waiter permission",
 				p.ID,
 			),
 		)
