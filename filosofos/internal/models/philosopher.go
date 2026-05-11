@@ -1,68 +1,5 @@
-package models
-
-import (
-	"fmt"
-	"sync"
-	"time"
-
-	"filosofos/internal/logger"
-	"filosofos/internal/utils"
-)
-
-type Philosopher struct {
-	ID        int
-	LeftFork  *Fork
-	RightFork *Fork
-	Stats     *Stats
-}
-
-func NewPhilosopher(
-	id int,
-	left *Fork,
-	right *Fork,
-) *Philosopher {
-	return &Philosopher{
-		ID:        id,
-		LeftFork:  left,
-		RightFork: right,
-		Stats:     &Stats{},
-	}
-}
-
-func (p *Philosopher) Think() {
-	logger.Log(
-		fmt.Sprintf(
-			"Philosopher %d is thinking",
-			p.ID,
-		),
-	)
-
-	utils.RandomDelay(500)
-}
-
-func (p *Philosopher) Eat() {
-	logger.Log(
-		fmt.Sprintf(
-			"Philosopher %d started eating",
-			p.ID,
-		),
-	)
-
-	utils.RandomDelay(500)
-
-	p.Stats.IncrementMeals()
-
-	logger.Log(
-		fmt.Sprintf(
-			"Philosopher %d finished eating",
-			p.ID,
-		),
-	)
-}
-
-func (p *Philosopher) DineWithWaiter(
+func (p *Philosopher) DineWithHierarchy(
 	wg *sync.WaitGroup,
-	waiter chan struct{},
 	iterations int,
 ) {
 	defer wg.Done()
@@ -71,79 +8,65 @@ func (p *Philosopher) DineWithWaiter(
 
 		p.Think()
 
-		// Request permission from waiter
+		// Determine fork order
+		firstFork := p.LeftFork
+		secondFork := p.RightFork
+
+		if p.RightFork.ID < p.LeftFork.ID {
+			firstFork = p.RightFork
+			secondFork = p.LeftFork
+		}
+
 		logger.Log(
 			fmt.Sprintf(
-				"Philosopher %d asking waiter permission",
+				"Philosopher %d trying fork %d first",
 				p.ID,
+				firstFork.ID,
 			),
 		)
 
-		waiter <- struct{}{}
+		<-firstFork.Token
 
 		logger.Log(
 			fmt.Sprintf(
-				"Philosopher %d received waiter permission",
+				"Philosopher %d picked fork %d",
 				p.ID,
-			),
-		)
-
-		// Pick left fork
-		logger.Log(
-			fmt.Sprintf(
-				"Philosopher %d trying LEFT fork",
-				p.ID,
-			),
-		)
-
-		<-p.LeftFork.Token
-
-		logger.Log(
-			fmt.Sprintf(
-				"Philosopher %d picked LEFT fork",
-				p.ID,
+				firstFork.ID,
 			),
 		)
 
 		time.Sleep(100 * time.Millisecond)
 
-		// Pick right fork
 		logger.Log(
 			fmt.Sprintf(
-				"Philosopher %d trying RIGHT fork",
+				"Philosopher %d trying fork %d second",
 				p.ID,
+				secondFork.ID,
 			),
 		)
 
-		<-p.RightFork.Token
+		<-secondFork.Token
 
 		logger.Log(
 			fmt.Sprintf(
-				"Philosopher %d picked RIGHT fork",
+				"Philosopher %d picked fork %d",
 				p.ID,
+				secondFork.ID,
 			),
 		)
 
 		p.Eat()
 
 		// Release forks
-		p.LeftFork.Token <- struct{}{}
-		p.RightFork.Token <- struct{}{}
+		firstFork.Token <- struct{}{}
+		secondFork.Token <- struct{}{}
 
 		logger.Log(
 			fmt.Sprintf(
-				"Philosopher %d released forks",
+				"Philosopher %d released forks %d and %d",
 				p.ID,
-			),
-		)
-
-		// Release waiter permission
-		<-waiter
-
-		logger.Log(
-			fmt.Sprintf(
-				"Philosopher %d released waiter permission",
-				p.ID,
+				firstFork.ID,
+				secondFork.ID,
 			),
 		)
 	}
