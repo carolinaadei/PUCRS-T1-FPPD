@@ -239,9 +239,8 @@ func (p *Player) Play(
 			)
 
 			p.knock(slapCh, slapOnce, slapper)
-
-			// Continue the loop: the next select iteration
-			// will see slapCh closed and react.
+			p.reactToSlap(slapper, reactionCounter, resultsCh)
+			return
 		}
 
 		// ---- 3. Discard a card to the left neighbour ----
