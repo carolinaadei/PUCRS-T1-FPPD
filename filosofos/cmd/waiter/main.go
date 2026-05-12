@@ -11,64 +11,70 @@ import (
 
 const (
 	NumPhilosophers = 5
-	Iterations      = 20
+	Iterations      = 1000
+	Experiments     = 5
 )
 
 func main() {
 	rand.Seed(time.Now().UnixNano())
 
-	fmt.Println("=== DINING PHILOSOPHERS — WAITER STRATEGY ===")
+	for experiment := 1; experiment <= Experiments; experiment++ {
 
-	// Create waiter semaphore
-	waiter := make(
-		chan struct{},
-		NumPhilosophers-1,
-	)
+		metrics.PrintExperimentHeader(
+			"WAITER",
+			experiment,
+		)
 
-	// Create forks
-	forks := make([]*models.Fork, NumPhilosophers)
+		waiter := make(
+			chan struct{},
+			NumPhilosophers-1,
+		)
 
-	for i := 0; i < NumPhilosophers; i++ {
-		forks[i] = models.NewFork(i)
-	}
+		forks := make(
+			[]*models.Fork,
+			NumPhilosophers,
+		)
 
-	// Create philosophers
-	philosophers := make(
-		[]*models.Philosopher,
-		NumPhilosophers,
-	)
+		for i := 0; i < NumPhilosophers; i++ {
+			forks[i] = models.NewFork(i)
+		}
 
-	for i := 0; i < NumPhilosophers; i++ {
+		philosophers := make(
+			[]*models.Philosopher,
+			NumPhilosophers,
+		)
 
-		leftFork := forks[i]
-		rightFork := forks[(i+1)%NumPhilosophers]
+		for i := 0; i < NumPhilosophers; i++ {
 
-		philosophers[i] = models.NewPhilosopher(
-			i,
-			leftFork,
-			rightFork,
+			leftFork := forks[i]
+			rightFork := forks[(i+1)%NumPhilosophers]
+
+			philosophers[i] = models.NewPhilosopher(
+				i,
+				leftFork,
+				rightFork,
+			)
+		}
+
+		var wg sync.WaitGroup
+
+		for _, philosopher := range philosophers {
+
+			wg.Add(1)
+
+			go philosopher.DineWithWaiter(
+				&wg,
+				waiter,
+				Iterations,
+			)
+		}
+
+		wg.Wait()
+
+		metrics.PrintDetailedReport(
+			philosophers,
 		)
 	}
 
-	var wg sync.WaitGroup
-
-	// Start dining
-	for _, philosopher := range philosophers {
-
-		wg.Add(1)
-
-		go philosopher.DineWithWaiter(
-			&wg,
-			waiter,
-			Iterations,
-		)
-	}
-
-	wg.Wait()
-
-	fmt.Println("\nDinner finished successfully")
-
-	metrics.PrintFairnessReport(
-		philosophers,
-	)
+	fmt.Println("\nAll experiments finished")
 }

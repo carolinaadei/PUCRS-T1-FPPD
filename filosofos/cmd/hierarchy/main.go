@@ -11,57 +11,71 @@ import (
 
 const (
 	NumPhilosophers = 5
-	Iterations      = 20
+	Iterations      = 1000
+	Experiments     = 5
 )
 
 func main() {
 	rand.Seed(time.Now().UnixNano())
 
-	fmt.Println("=== DINING PHILOSOPHERS — HIERARCHY STRATEGY ===")
+	for experiment := 1; experiment <= Experiments; experiment++ {
 
-	// Create forks
-	forks := make([]*models.Fork, NumPhilosophers)
+		metrics.PrintExperimentHeader(
+			"HIERARCHY",
+			experiment,
+		)
 
-	for i := 0; i < NumPhilosophers; i++ {
-		forks[i] = models.NewFork(i)
-	}
+		// Create forks
+		forks := make(
+			[]*models.Fork,
+			NumPhilosophers,
+		)
 
-	// Create philosophers
-	philosophers := make(
-		[]*models.Philosopher,
-		NumPhilosophers,
-	)
+		for i := 0; i < NumPhilosophers; i++ {
+			forks[i] = models.NewFork(i)
+		}
 
-	for i := 0; i < NumPhilosophers; i++ {
+		// Create philosophers
+		philosophers := make(
+			[]*models.Philosopher,
+			NumPhilosophers,
+		)
 
-		leftFork := forks[i]
-		rightFork := forks[(i+1)%NumPhilosophers]
+		for i := 0; i < NumPhilosophers; i++ {
 
-		philosophers[i] = models.NewPhilosopher(
-			i,
-			leftFork,
-			rightFork,
+			leftFork := forks[i]
+			rightFork := forks[(i+1)%NumPhilosophers]
+
+			philosophers[i] = models.NewPhilosopher(
+				i,
+				leftFork,
+				rightFork,
+			)
+		}
+
+		var wg sync.WaitGroup
+
+		// Start simulation
+		for _, philosopher := range philosophers {
+
+			wg.Add(1)
+
+			go philosopher.DineWithHierarchy(
+				&wg,
+				Iterations,
+			)
+		}
+
+		wg.Wait()
+
+		fmt.Println(
+			"\nDinner finished successfully",
+		)
+
+		metrics.PrintDetailedReport(
+			philosophers,
 		)
 	}
 
-	var wg sync.WaitGroup
-
-	// Start dining
-	for _, philosopher := range philosophers {
-
-		wg.Add(1)
-
-		go philosopher.DineWithHierarchy(
-			&wg,
-			Iterations,
-		)
-	}
-
-	wg.Wait()
-
-	fmt.Println("\nDinner finished successfully")
-
-	metrics.PrintFairnessReport(
-		philosophers,
-	)
+	fmt.Println("\nAll experiments finished")
 }
