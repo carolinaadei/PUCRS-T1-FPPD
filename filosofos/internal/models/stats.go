@@ -29,6 +29,20 @@ func (s *PhilosopherStats) AddWaitTime(
 	s.TotalWaitTime += duration
 }
 
+func (s *PhilosopherStats) GetMeals() int {
+	s.Mutex.Lock()
+	defer s.Mutex.Unlock()
+
+	return s.Meals
+}
+
+func (s *PhilosopherStats) GetTotalWaitTime() time.Duration {
+	s.Mutex.Lock()
+	defer s.Mutex.Unlock()
+
+	return s.TotalWaitTime
+}
+
 func (s *PhilosopherStats) AverageWaitTime() time.Duration {
 
 	s.Mutex.Lock()

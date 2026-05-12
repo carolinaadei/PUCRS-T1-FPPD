@@ -15,19 +15,31 @@ func PrintDetailedReport(
 
 	var totalWait time.Duration
 
-	minMeals := philosophers[0].Stats.Meals
-	maxMeals := philosophers[0].Stats.Meals
+	minMeals := philosophers[0].
+		Stats.
+		GetMeals()
+
+	maxMeals := philosophers[0].
+		Stats.
+		GetMeals()
 
 	for _, philosopher := range philosophers {
 
-		meals := philosopher.Stats.Meals
+		meals := philosopher.
+			Stats.
+			GetMeals()
 
-		avgWait := philosopher.
+		totalBlockedTime := philosopher.
+			Stats.
+			GetTotalWaitTime()
+
+		averageWait := philosopher.
 			Stats.
 			AverageWaitTime()
 
 		totalMeals += meals
-		totalWait += philosopher.Stats.TotalWaitTime
+
+		totalWait += totalBlockedTime
 
 		if meals < minMeals {
 			minMeals = meals
@@ -49,12 +61,12 @@ func PrintDetailedReport(
 
 		fmt.Printf(
 			"Total blocked time: %v\n",
-			philosopher.Stats.TotalWaitTime,
+			totalBlockedTime,
 		)
 
 		fmt.Printf(
 			"Average waiting time: %v\n",
-			avgWait,
+			averageWait,
 		)
 	}
 
