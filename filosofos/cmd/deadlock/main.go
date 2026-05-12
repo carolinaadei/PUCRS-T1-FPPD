@@ -3,20 +3,22 @@ package main
 import (
 	"filosofos/internal/models"
 	"fmt"
-	"math/rand"
 	"sync"
 	"time"
 )
 
 const (
 	NumPhilosophers = 5
-	Iterations      = 10
+	Iterations      = 100
+	WatchdogSeconds = 5
 )
 
 func main() {
-	rand.Seed(time.Now().UnixNano())
-
-	fmt.Println("=== DINING PHILOSOPHERS — DEADLOCK VERSION ===")
+	fmt.Println("=== DINING PHILOSOPHERS — BASE VERSION (DEADLOCK PRONE) ===")
+	fmt.Println("All philosophers pick LEFT fork first, then RIGHT fork.")
+	fmt.Println("Expect a circular wait (Coffman condition 4).")
+	fmt.Printf("Watchdog: %ds without progress => declares deadlock.\n\n",
+		WatchdogSeconds)
 
 	// Create forks
 	forks := make([]*models.Fork, NumPhilosophers)
@@ -42,6 +44,13 @@ func main() {
 
 	var wg sync.WaitGroup
 
+	// Start barrier: forces all philosophers to leave the
+	// initial thinking phase together, guaranteeing that
+	// the circular wait pattern is triggered on the very
+	// first round (instead of relying on random timing).
+	var startBarrier sync.WaitGroup
+	startBarrier.Add(NumPhilosophers)
+
 	// Start philosophers
 	for _, philosopher := range philosophers {
 		wg.Add(1)
@@ -49,10 +58,40 @@ func main() {
 		go philosopher.Dine(
 			&wg,
 			Iterations,
+			&startBarrier,
 		)
 	}
 
-	wg.Wait()
+	// Watchdog goroutine: completion vs timeout.
+	// The Go runtime itself crashes with
+	// "fatal error: all goroutines are asleep - deadlock!"
+	// when *every* goroutine is blocked, but the WaitGroup
+	// waiter in the main goroutine would prevent the runtime
+	// from detecting it cleanly. We use a watchdog so the
+	// demo always terminates with a readable diagnosis.
+	done := make(chan struct{})
 
-	fmt.Println("\nDinner finished")
+	go func() {
+		wg.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		fmt.Println("\nDinner finished (no deadlock observed this run)")
+	case <-time.After(WatchdogSeconds * time.Second):
+		fmt.Printf("\n*** WATCHDOG TRIGGERED: no philosopher finished in %ds ***\n",
+			WatchdogSeconds)
+		fmt.Println("*** Probable DEADLOCK — circular wait reached ***")
+
+		// Print partial progress
+		fmt.Println("\nPartial meal counts at the moment of detection:")
+
+		for _, p := range philosophers {
+			fmt.Printf("  Philosopher %d: %d meals\n",
+				p.ID,
+				p.Stats.GetMeals(),
+			)
+		}
+	}
 }

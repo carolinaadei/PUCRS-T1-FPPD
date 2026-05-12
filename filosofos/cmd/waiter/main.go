@@ -4,20 +4,16 @@ import (
 	"filosofos/internal/metrics"
 	"filosofos/internal/models"
 	"fmt"
-	"math/rand"
 	"sync"
-	"time"
 )
 
 const (
 	NumPhilosophers = 5
-	Iterations      = 1000
+	Iterations      = 100
 	Experiments     = 5
 )
 
 func main() {
-	rand.Seed(time.Now().UnixNano())
-
 	for experiment := 1; experiment <= Experiments; experiment++ {
 
 		metrics.PrintExperimentHeader(
@@ -70,6 +66,10 @@ func main() {
 		}
 
 		wg.Wait()
+
+		fmt.Println(
+			"\nDinner finished successfully",
+		)
 
 		metrics.PrintDetailedReport(
 			philosophers,

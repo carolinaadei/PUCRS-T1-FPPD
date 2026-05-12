@@ -61,7 +61,113 @@ func (p *Philosopher) Eat() {
 }
 
 //
+// BASE STRATEGY (DEADLOCK PRONE)
+//
+// All philosophers pick LEFT fork first, then RIGHT fork.
+// If every philosopher manages to acquire the LEFT fork
+// before any of them tries the RIGHT fork, a circular
+// wait is established (Coffman condition 4) and the system
+// deadlocks: no philosopher can ever release a fork.
+//
+
+func (p *Philosopher) Dine(
+	wg *sync.WaitGroup,
+	iterations int,
+	startBarrier *sync.WaitGroup,
+) {
+	defer wg.Done()
+
+	for i := 0; i < iterations; i++ {
+
+		p.Think()
+
+		// On the first iteration, synchronise all philosophers
+		// right before the LEFT-fork acquisition. This forces
+		// the worst case scenario: everyone reaches for LEFT
+		// at the same moment, every fork gets grabbed, and the
+		// circular wait is established immediately.
+		// Without this, random Think delays let some philosophers
+		// finish a full meal before others even start, masking
+		// the deadlock.
+		if i == 0 && startBarrier != nil {
+			startBarrier.Done()
+			startBarrier.Wait()
+		}
+
+		// Start waiting timer
+		waitStart := time.Now()
+
+		// Pick LEFT fork
+		logger.Log(
+			fmt.Sprintf(
+				"Philosopher %d trying LEFT fork %d",
+				p.ID,
+				p.LeftFork.ID,
+			),
+		)
+
+		<-p.LeftFork.Token
+
+		logger.Log(
+			fmt.Sprintf(
+				"Philosopher %d picked LEFT fork %d",
+				p.ID,
+				p.LeftFork.ID,
+			),
+		)
+
+		// Forced delay to maximize the chance of deadlock:
+		// gives every philosopher time to grab its LEFT fork
+		// before anyone tries to grab a RIGHT fork.
+		time.Sleep(100 * time.Millisecond)
+
+		// Pick RIGHT fork
+		logger.Log(
+			fmt.Sprintf(
+				"Philosopher %d trying RIGHT fork %d",
+				p.ID,
+				p.RightFork.ID,
+			),
+		)
+
+		<-p.RightFork.Token
+
+		logger.Log(
+			fmt.Sprintf(
+				"Philosopher %d picked RIGHT fork %d",
+				p.ID,
+				p.RightFork.ID,
+			),
+		)
+
+		// Stop waiting timer
+		waitDuration := time.Since(waitStart)
+
+		p.Stats.AddWaitTime(waitDuration)
+
+		p.Eat()
+
+		// Release forks
+		p.LeftFork.Token <- struct{}{}
+		p.RightFork.Token <- struct{}{}
+
+		logger.Log(
+			fmt.Sprintf(
+				"Philosopher %d released forks",
+				p.ID,
+			),
+		)
+	}
+}
+
+//
 // WAITER STRATEGY
+//
+// A waiter (semaphore channel with capacity N-1) limits
+// the number of philosophers competing for forks at the
+// same time. With at most N-1 contenders, at least one
+// philosopher always has access to both forks.
+// Breaks Coffman condition 2 (hold and wait at scale).
 //
 
 func (p *Philosopher) DineWithWaiter(
@@ -163,6 +269,12 @@ func (p *Philosopher) DineWithWaiter(
 
 //
 // HIERARCHY STRATEGY
+//
+// Global ordering: every philosopher acquires the fork
+// with the lower ID first and the higher ID second.
+// This breaks Coffman condition 4 (circular wait):
+// no cycle can form because acquisition follows a
+// total order on fork IDs.
 //
 
 func (p *Philosopher) DineWithHierarchy(
